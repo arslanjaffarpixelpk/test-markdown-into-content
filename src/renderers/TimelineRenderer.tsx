@@ -21,7 +21,7 @@ export function TimelineRenderer({ data }: RichRendererProps) {
         </CardHeader>
       )}
       <CardContent className={spec.title ? 'pt-2' : 'pt-6'}>
-        <ol className="relative">
+        <ol className="relative" style={{ listStyle: 'none', paddingLeft: 0 }}>
           {spec.events.map((ev, i) => {
             const last = i === spec.events.length - 1;
             return (

@@ -12,6 +12,16 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string; // markdown for assistant, plain text for user
+  /** Streamed "thinking" text (assistant only). */
+  thought?: string;
+  /** True while this assistant message is still streaming. */
+  streaming?: boolean;
+  /** Relevant laws returned in the completion event. */
+  relevantLaws?: unknown[];
+  /** Relevant judgments returned in the completion event. */
+  relevantJudgments?: unknown[];
+  /** Suggested follow-up questions from the completion event. */
+  suggestedQuestions?: string[];
 }
 
 // ---------------------------------------------------------------------------

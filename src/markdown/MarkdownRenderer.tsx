@@ -7,10 +7,13 @@ import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import { remarkRichDirective } from './remarkRichDirective';
 import { markdownComponents } from './overrides';
+import { StreamingContext } from './streamingContext';
 import { registeredTypes } from '../renderers/registry';
 
 interface MarkdownRendererProps {
   content: string;
+  /** True while `content` is still streaming — suppresses partial-block errors. */
+  streaming?: boolean;
 }
 
 /**
@@ -21,23 +24,25 @@ interface MarkdownRendererProps {
  *   rehype: katex (math) → highlight (code fences, rich langs left as plain text)
  *   components: intercept fenced rich blocks + directive rich blocks, style the rest
  */
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, streaming = false }: MarkdownRendererProps) {
   // Rich fence languages must NOT be syntax-highlighted, or their body would be
   // split into token <span>s and we'd lose the raw JSON/DSL text.
   const plainText = useMemo(() => registeredTypes(), []);
 
   return (
-    <div className="markdown-body">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath, remarkDirective, remarkRichDirective]}
-        rehypePlugins={[
-          rehypeKatex,
-          [rehypeHighlight, { ignoreMissing: true, plainText }],
-        ]}
-        components={markdownComponents}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
+    <StreamingContext.Provider value={streaming}>
+      <div className="markdown-body">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkMath, remarkDirective, remarkRichDirective]}
+          rehypePlugins={[
+            rehypeKatex,
+            [rehypeHighlight, { ignoreMissing: true, plainText }],
+          ]}
+          components={markdownComponents}
+        >
+          {content}
+        </ReactMarkdown>
+      </div>
+    </StreamingContext.Provider>
   );
 }

@@ -1,35 +1,41 @@
 import { useEffect, useRef } from 'react';
 import { Sparkles } from 'lucide-react';
 import { Message } from './Message';
+import { Composer, type SendFn } from './Composer';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { ChatMessage } from '@/types';
 
 interface ChatWindowProps {
   messages: ChatMessage[];
   loading: boolean;
+  streaming: boolean;
+  onSend: SendFn;
+  onStop?: () => void;
 }
 
-export function ChatWindow({ messages, loading }: ChatWindowProps) {
+export function ChatWindow({ messages, loading, streaming, onSend, onStop }: ChatWindowProps) {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, loading]);
+  }, [messages, loading, streaming]);
 
   return (
-    <main className="min-w-0 flex-1">
-      <ScrollArea className="h-full">
+    <main className="flex h-full min-w-0 flex-1 flex-col">
+      <ScrollArea className="flex-1">
         <div className="px-4 py-7 sm:px-8">
           {messages.length === 0 && !loading && (
             <div className="mx-auto mt-[14vh] max-w-md text-center text-muted-foreground">
               <Sparkles className="mx-auto h-10 w-10 text-primary" />
               <h2 className="mt-3 text-xl font-semibold text-foreground">Rich Content Rendering</h2>
-              <p className="mt-1.5">Pick a sample AI response from the left to see it rendered.</p>
+              <p className="mt-1.5">
+                Ask the AI below to stream a live response, or pick a sample from the left.
+              </p>
             </div>
           )}
 
           {messages.map((m) => (
-            <Message key={m.id} message={m} />
+            <Message key={m.id} message={m} onAsk={onSend} />
           ))}
 
           {loading && (
@@ -47,6 +53,8 @@ export function ChatWindow({ messages, loading }: ChatWindowProps) {
           <div ref={endRef} />
         </div>
       </ScrollArea>
+
+      <Composer onSend={onSend} onStop={onStop} disabled={streaming} />
     </main>
   );
 }

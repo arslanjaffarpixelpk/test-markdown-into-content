@@ -13,5 +13,15 @@ export default defineConfig({
   server: {
     port: 5173,
     open: true,
+    proxy: {
+      // Route `/ai/*` to the local Flask AI server so browser calls stay
+      // same-origin (no CORS/preflight). `VITE_AI_SERVER_URL` is set to `/ai`
+      // in .env.local; change the target to match your local Flask port.
+      '/ai': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/ai/, ''),
+      },
+    },
   },
 });

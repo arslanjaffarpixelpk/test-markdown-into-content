@@ -1,13 +1,37 @@
 # Rich Content Markdown Renderer — Prototype
 
 A **Vite + React + TypeScript** prototype that renders structured AI responses —
-charts, tables, timelines, flow diagrams, infographics, and interactive
-templates — directly inside a chat UI, the way Claude renders rich content.
+charts, tables, timelines, flow diagrams, infographics, callouts, accordions,
+steps, code groups, cards, badges, progress, and interactive templates —
+directly inside a chat UI, the way Claude renders rich content. Styled with
+**Tailwind CSS + shadcn/ui**.
 
 AI responses are just **markdown**. Rich content is expressed with a small
 extension convention (fenced code blocks and/or directives) that a **modular
 renderer registry** turns into React components. Adding a new content type is a
 two-line change with no edits to the markdown pipeline.
+
+## Supported formats
+
+| Block type | Renderer | Payload |
+| --- | --- | --- |
+| `chart` | Recharts (in shadcn Card) | JSON |
+| `table` | TanStack Table (shadcn Table) | JSON |
+| `timeline` | custom | JSON |
+| `mermaid` | Mermaid | DSL |
+| `infographic` | custom (shadcn Card) | JSON |
+| `progress` | shadcn Progress | JSON |
+| `callout` | shadcn Alert | JSON |
+| `accordion` | shadcn Accordion | JSON |
+| `steps` | custom | JSON |
+| `codegroup` | shadcn Tabs | JSON |
+| `cards` | shadcn Card grid | JSON |
+| `badges` | shadcn Badge | JSON |
+| `template` | shadcn Tabs/Button | JSON |
+
+Plus everything standard markdown covers (headings, lists, task lists,
+blockquotes, GFM tables, syntax-highlighted code, math). See
+[STANDARDS.md](STANDARDS.md) for each schema.
 
 The "AI backend" is mocked with **MSW**, serving sample markdown files. To go
 live, swap the mock for the real AI endpoint — the client code is unchanged.

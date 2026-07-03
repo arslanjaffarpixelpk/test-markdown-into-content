@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useContext, useMemo } from 'react';
 import { FileWarning } from 'lucide-react';
 import { getRenderer } from '../renderers/registry';
+import { StreamingContext } from './streamingContext';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -37,6 +38,7 @@ function Fallback({ label, type, raw }: { label: string; type: string; raw: stri
  */
 export function RichBlock({ type, raw, attributes }: RichBlockProps) {
   const entry = getRenderer(type);
+  const streaming = useContext(StreamingContext);
 
   const parsed = useMemo(() => {
     if (!entry) return { ok: false as const };
@@ -53,6 +55,17 @@ export function RichBlock({ type, raw, attributes }: RichBlockProps) {
   }
 
   if (!parsed.ok) {
+    // Mid-stream, a rich fence often has incomplete JSON. Show a subtle
+    // placeholder and let it resolve once the closing fence arrives, rather
+    // than flashing a parse error on every token.
+    if (streaming) {
+      return (
+        <div className="my-4 flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-primary/60" />
+          Rendering <code className="text-xs">{type}</code>…
+        </div>
+      );
+    }
     return <Fallback label="Could not parse block" type={type} raw={raw} />;
   }
 

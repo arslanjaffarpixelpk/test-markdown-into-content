@@ -21,7 +21,7 @@ export function StepsRenderer({ data }: RichRendererProps) {
     });
 
   return (
-    <ol className="my-4 space-y-4">
+    <ol className="my-4 space-y-4" style={{ listStyle: 'none', paddingLeft: 0 }}>
       {spec.steps.map((step, i) => {
         const isDone = done.has(i);
         const Marker = interactive ? 'button' : 'div';

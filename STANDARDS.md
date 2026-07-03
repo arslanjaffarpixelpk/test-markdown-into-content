@@ -109,6 +109,43 @@ Quiz:
 { "kind": "quiz", "question": "…", "options": ["a", "b"], "answerIndex": 1, "explanation": "optional" }
 ```
 
+### `callout` — shadcn Alert
+```json
+{ "variant": "note | tip | warning | danger", "title": "optional", "body": "text" }
+```
+
+### `accordion` — shadcn Accordion
+```json
+{ "items": [{ "title": "Question?", "body": "Answer." }] }
+```
+
+### `steps` — custom (numbered guide / checklist)
+```json
+{ "interactive": false, "steps": [{ "title": "Install", "body": "optional detail" }] }
+```
+Set `"interactive": true` to make each step a checkable item.
+
+### `codegroup` — shadcn Tabs (tabbed code)
+```json
+{ "tabs": [{ "label": "npm", "language": "bash", "code": "npm install x" }] }
+```
+
+### `cards` — shadcn Card grid
+```json
+{ "columns": 2, "cards": [{ "title": "Charts", "description": "optional", "body": "optional", "badge": "optional", "footer": "optional" }] }
+```
+
+### `badges` — shadcn Badge row
+```json
+{ "title": "optional", "badges": [{ "label": "Stable", "variant": "default | secondary | destructive | outline" }] }
+```
+
+### `progress` — shadcn Progress bars
+```json
+{ "title": "optional", "items": [{ "label": "Docs", "value": 60, "max": 100 }] }
+```
+`max` defaults to 100 (value read as a percentage).
+
 ## 3. Fallback behavior
 
 | Situation | Result |
