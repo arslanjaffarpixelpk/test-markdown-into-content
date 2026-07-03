@@ -179,6 +179,22 @@ export default function App() {
     setMessages((prev) => prev.map((m) => (m.streaming ? { ...m, streaming: false } : m)));
   }, []);
 
+  // Reset the conversation (aborting any in-flight stream first).
+  const handleClear = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStreaming(false);
+    setActiveId(null);
+    setMessages([]);
+  }, []);
+
+  // Append a rendered assistant message from an example snippet (no AI call).
+  // Exercises the same render path a live AI response uses.
+  const handleInsertExample = useCallback((markdown: string) => {
+    setActiveId(null);
+    setMessages((prev) => [...prev, { id: nextId(), role: 'assistant', content: markdown }]);
+  }, []);
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar samples={samples} activeId={activeId} onSelect={handleSelect} />
@@ -188,6 +204,8 @@ export default function App() {
         streaming={streaming}
         onSend={handleSend}
         onStop={handleStop}
+        onInsertExample={handleInsertExample}
+        onClear={handleClear}
       />
     </div>
   );
