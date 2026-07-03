@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npm install 2>&1)",
+      "PowerShell(npx --yes shadcn@latest add card table tabs alert accordion badge button progress separator scroll-area --yes --overwrite 2>&1)"
+    ]
+  }
+}
