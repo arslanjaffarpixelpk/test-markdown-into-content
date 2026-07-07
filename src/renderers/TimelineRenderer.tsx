@@ -1,51 +1,48 @@
 import type { RichRendererProps } from './registry';
-import type { TimelineSpec } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { TimelinePayload } from './schemas';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
-const DOT: Record<string, string> = {
-  done: 'bg-success border-success',
-  active: 'bg-primary border-primary ring-4 ring-primary/20',
-  upcoming: 'bg-background border-muted-foreground/40',
-  default: 'bg-background border-muted-foreground/40',
-};
+const STATUS_DOT = {
+  done: 'bg-primary border-primary',
+  current: 'bg-accent-foreground border-accent-foreground ring-4 ring-primary/20',
+  upcoming: 'bg-muted border-border',
+} as const;
 
 export function TimelineRenderer({ data }: RichRendererProps) {
-  const spec = data as TimelineSpec;
+  const { events } = data as TimelinePayload;
 
   return (
-    <Card className="my-4">
-      {spec.title && (
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">{spec.title}</CardTitle>
-        </CardHeader>
-      )}
-      <CardContent className={spec.title ? 'pt-2' : 'pt-6'}>
-        <ol className="relative" style={{ listStyle: 'none', paddingLeft: 0 }}>
-          {spec.events.map((ev, i) => {
-            const last = i === spec.events.length - 1;
-            return (
-              <li key={i} className={cn('relative pl-8', !last && 'pb-6')}>
-                {!last && (
-                  <span className="absolute left-[5px] top-3 h-full w-px bg-border" aria-hidden />
+    <div className="my-4 space-y-0">
+      {events.map((event, i) => {
+        const status = event.status ?? (i < events.length - 1 ? 'done' : 'current');
+        const isLast = i === events.length - 1;
+
+        return (
+          <div key={i} className="flex gap-4">
+            <div className="flex flex-col items-center">
+              <div
+                className={cn(
+                  'mt-1 h-3 w-3 shrink-0 rounded-full border-2',
+                  STATUS_DOT[status] ?? STATUS_DOT.upcoming,
                 )}
-                <span
-                  className={cn(
-                    'absolute left-0 top-1.5 h-3 w-3 rounded-full border-2',
-                    DOT[ev.status ?? 'default'],
-                  )}
-                  aria-hidden
-                />
-                <div className="text-xs font-medium text-muted-foreground">{ev.date}</div>
-                <div className="text-[15px] font-semibold leading-snug">{ev.title}</div>
-                {ev.description && (
-                  <p className="mt-0.5 text-sm text-muted-foreground">{ev.description}</p>
+              />
+              {!isLast && <div className="w-px flex-1 bg-border" />}
+            </div>
+            <Card className={cn('mb-4 flex-1', status === 'current' && 'border-primary/40')}>
+              <CardContent className="p-4">
+                {event.date && (
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">{event.date}</p>
                 )}
-              </li>
-            );
-          })}
-        </ol>
-      </CardContent>
-    </Card>
+                <p className="font-medium">{event.title}</p>
+                {event.description && (
+                  <p className="mt-1 text-sm text-muted-foreground">{event.description}</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })}
+    </div>
   );
 }

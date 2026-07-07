@@ -1,130 +1,194 @@
-# Rich Content Markdown Renderer — Prototype
+# Rich Inline Chat — Prototype
 
-A **Vite + React + TypeScript** prototype that renders structured AI responses —
-charts, tables, timelines, flow diagrams, infographics, callouts, accordions,
-steps, code groups, cards, badges, progress, and interactive templates —
-directly inside a chat UI, the way Claude renders rich content. Styled with
-**Tailwind CSS + shadcn/ui**.
+Render **structured AI markdown inline in a streaming chat**. Instead of a flat wall of text, the AI emits special fenced code blocks — `callout`, `compare`, `chart`, `widget` — that are intercepted and rendered as **live React components** right in the chat stream, with Zod validation, typed streaming skeletons, and a sandboxed interactive widget that can send prompts back into the conversation.
 
-AI responses are just **markdown**. Rich content is expressed with a small
-extension convention (fenced code blocks and/or directives) that a **modular
-renderer registry** turns into React components. Adding a new content type is a
-two-line change with no edits to the markdown pipeline.
-
-## Supported formats
-
-| Block type | Renderer | Payload |
-| --- | --- | --- |
-| `chart` | Recharts (in shadcn Card) | JSON |
-| `table` | TanStack Table (shadcn Table) | JSON |
-| `timeline` | custom | JSON |
-| `mermaid` | Mermaid | DSL |
-| `infographic` | custom (shadcn Card) | JSON |
-| `progress` | shadcn Progress | JSON |
-| `callout` | shadcn Alert | JSON |
-| `accordion` | shadcn Accordion | JSON |
-| `steps` | custom | JSON |
-| `codegroup` | shadcn Tabs | JSON |
-| `cards` | shadcn Card grid | JSON |
-| `badges` | shadcn Badge | JSON |
-| `template` | shadcn Tabs/Button | JSON |
-
-Plus everything standard markdown covers (headings, lists, task lists,
-blockquotes, GFM tables, syntax-highlighted code, math). See
-[STANDARDS.md](STANDARDS.md) for each schema.
-
-The "AI backend" is mocked with **MSW**, serving sample markdown files. To go
-live, swap the mock for the real AI endpoint — the client code is unchanged.
+It runs with **no backend** out of the box (mock mode streams local fixtures), and also wires up to a real Flask AI server over Server-Sent Events.
 
 ---
 
-## Quick start
+## Highlights
+
+- **Registry-driven rich blocks** — adding a new content type is a 3-step change (schema + component + one registration line). Nothing else in the pipeline changes.
+- **Crash-proof rendering** — every rich block degrades gracefully: unknown type, bad JSON, schema mismatch, or a throwing renderer each fall back to a friendly alert instead of breaking the chat.
+- **Typed streaming skeletons** — while a block's JSON is still streaming in, a type-shaped placeholder is shown so the layout doesn't jump when the real component resolves.
+- **Sandboxed interactive widgets** — the AI can ship raw HTML/JS, rendered in an `allow-scripts`-only iframe (null-origin: no access to parent DOM, cookies, or storage) that can call back into the chat via a `postMessage` bridge.
+- **Mock or real backend** — one `streamChat()` function; flip modes from the header (persisted) or via env.
+- **Light/dark theming** — class-based dark mode with a no-flash init, theme-aware chart palette.
+
+---
+
+## Tech stack
+
+| Layer | Choice |
+|-------|--------|
+| Build / dev | Vite 6 + TypeScript 5.9 (strict) |
+| UI | React 18, Tailwind CSS 3.4, shadcn-style primitives (Radix Slot, CVA, `tailwind-merge`) |
+| Markdown | `react-markdown` 9 + `remark-gfm` |
+| Validation | Zod 3 |
+| Charts | Recharts 2 |
+| Icons | `lucide-react` |
+
+---
+
+## Getting started
 
 ```bash
+# 1. Install
 npm install
-npx msw init public/ --save   # one-time: generates public/mockServiceWorker.js
+
+# 2. (optional) configure the backend
+cp .env.example .env.local     # leave as-is to run in mock mode
+
+# 3. Run
 npm run dev                    # http://localhost:5173
 ```
 
-Pick a sample from the sidebar to see it render. `npm run build` type-checks and
-builds; `npm run typecheck` runs `tsc` only.
+Other scripts:
 
-> If `npm install` already ran MSW's postinstall, the worker file may already
-> exist — the `npx msw init` step is idempotent.
-
----
-
-## Architecture
-
-```
-AI markdown (mock .md via MSW /api/chat)
-   → api/chat.ts               fetch → markdown string   (swap point for real AI)
-   → MarkdownRenderer          react-markdown + remark/rehype plugins
-        ├─ standard markdown → styled HTML (headings, lists, GFM tables, math, code)
-        ├─ ```<type> fence   → intercepted in the `code`/`pre` override ─┐
-        └─ :::<type> directive → remarkRichDirective → <richblock> node ─┤
-                                                                          ▼
-                                                        RichBlock (single dispatcher)
-                                                          → registry.get(type)
-                                                          → parse body (JSON / DSL)
-                                                          → render inside ErrorBoundary
-                                                          → unknown / parse-fail = raw fallback
-                                                                          │
-        ┌──────────┬──────────┬───────────┬──────────┬─────────────┬──────┘
-      Chart      Table     Timeline    Mermaid   Infographic    Template
-    (Recharts) (TanStack)  (custom)   (mermaid)   (custom)      (custom)
+```bash
+npm run build       # tsc --noEmit + vite build
+npm run typecheck   # tsc --noEmit
+npm run preview     # preview the production build
 ```
 
-### Key files
+### Configuration (`.env.local`)
 
-| Path | Role |
-| --- | --- |
-| [src/renderers/registry.ts](src/renderers/registry.ts) | The registry — `registerRenderer` / `getRenderer`. The modularity core. |
-| [src/renderers/index.ts](src/renderers/index.ts) | Registers all built-in renderers. **Add new types here.** |
-| [src/markdown/MarkdownRenderer.tsx](src/markdown/MarkdownRenderer.tsx) | Wires react-markdown + remark/rehype plugins + overrides. |
-| [src/markdown/RichBlock.tsx](src/markdown/RichBlock.tsx) | Dispatcher: type → registry → parse → render + fallback. |
-| [src/markdown/overrides.tsx](src/markdown/overrides.tsx) | Intercepts fenced code + directive blocks; styles GFM output. |
-| [src/markdown/remarkRichDirective.ts](src/markdown/remarkRichDirective.ts) | Turns `:::type` directives into `<richblock>` nodes. |
-| [src/mocks/handlers.ts](src/mocks/handlers.ts) | MSW mock "AI backend". |
-| [src/api/chat.ts](src/api/chat.ts) | Client. **The single integration point to swap for the real AI.** |
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `VITE_AI_MODE` | `mock` (local fixtures, no server) or `real` (Flask SSE). | `real` if a server URL is set, else `mock` |
+| `VITE_AI_SERVER_URL` | Base URL for the AI backend. Use `/ai` to route through the Vite dev proxy and avoid CORS. | `/ai` |
+| `VITE_XAPIKey` | Sent as the `X-API-Key` header. | *(blank)* |
+| `VITE_AI_MODEL` | LLM model id passed to the server. | `gemini` |
+| `AI_PROXY_TARGET` | Where the dev proxy's `/ai/*` routes to. | `https://flask.pakistanlawbot.com` |
 
-See **[STANDARDS.md](STANDARDS.md)** for the block conventions, per-renderer JSON
-schemas, and how to add a renderer.
+You can also flip **Mock ⇄ Real** at runtime from the header toggle (persisted in `localStorage`).
 
 ---
 
-## Adding a new renderer (the whole process)
+## How it works
 
-1. Create `src/renderers/BadgeRenderer.tsx` exporting a component that takes
-   `{ data, raw, attributes }`.
-2. Register it in [src/renderers/index.ts](src/renderers/index.ts):
-   ```ts
-   registerRenderer('badge', { render: BadgeRenderer });
-   ```
-3. Done. AI can now emit ` ```badge ` fences **and** `:::badge` directives; both
-   route to your component. No pipeline edits.
+The pipeline turns an AI markdown string into rich UI in four stages:
+
+```
+AI response (markdown w/ fenced blocks)
+        │
+        ▼
+  MarkdownRenderer ── react-markdown + remark-gfm
+        │
+        ▼
+  overrides (pre/code) ── intercept fences whose language is a registered type
+        │                 (everything else renders as normal styled markdown)
+        ▼
+  RichBlock ── parse → Zod-validate → render in an ErrorBoundary
+        │        (degrades to skeleton/alert at every failure point)
+        ▼
+  Renderer (callout · compare · chart · widget)
+```
+
+### The four building blocks
+
+1. **Renderer Registry** — [`src/renderers/registry.ts`](src/renderers/registry.ts)
+   A `Map<type, { render, schema, parse?, label? }>`. `registerRenderer()` / `getRenderer()` / `hasRenderer()`.
+
+2. **Fence interception** — [`src/markdown/overrides.tsx`](src/markdown/overrides.tsx)
+   `react-markdown` `pre`/`code` overrides route registered fence languages to `RichBlock`; unknown fences render as ordinary code, links open safely in a new tab.
+
+3. **The dispatcher** — [`src/markdown/RichBlock.tsx`](src/markdown/RichBlock.tsx)
+   Parses + validates each block and degrades safely:
+   - unknown type → *"Unknown block type"* alert
+   - bad JSON while streaming → typed skeleton; when done → *"Could not parse"* alert
+   - schema mismatch → *"Invalid block"* alert (with the first Zod issue)
+   - renderer throws → caught by an `ErrorBoundary`
+
+4. **Backend abstraction** — [`src/api/chat.ts`](src/api/chat.ts) / [`src/api/mockChat.ts`](src/api/mockChat.ts)
+   One `streamChat()` dispatches to the mock or the real Flask SSE client (brace-balanced JSON reassembly, thinking/content/completion events, session tokens, a 20s inactivity watchdog). The rest of the app is backend-agnostic.
 
 ---
 
-## Design decisions
+## Block types
 
-- **No streaming (v1).** The mock returns the full response at once; renderers
-  never see partial blocks. Streaming is a later milestone.
-- **No raw HTML.** `react-markdown` renders no raw HTML (we don't add
-  `rehype-raw`), and renderer inputs are parsed as JSON/DSL — never `eval`'d — so
-  an AI response can't inject scripts. Mermaid runs with `securityLevel: 'strict'`.
-- **Two syntaxes, one dispatcher.** Fenced blocks and directives both resolve to
-  `RichBlock`, so the AI can be prompted with whichever convention fits.
-- **Graceful degradation.** Unknown block types and malformed payloads render
-  their raw body with a notice; a throwing renderer is caught by an
-  `ErrorBoundary` and never takes down the message.
+Each type validates its fenced JSON body against a [Zod schema](src/renderers/schemas.ts) — the contract between the AI and the frontend.
+
+### `callout`
+```callout
+{ "variant": "tip", "title": "Heads up", "body": "This renders as an alert box." }
+```
+Variants: `note` · `tip` · `warning` · `danger`.
+
+### `compare`
+Side-by-side option cards; the `recommended` one is highlighted. **Each button feeds a prompt back into the chat.**
+```compare
+{
+  "title": "Pick a plan",
+  "options": [
+    { "title": "Starter", "points": ["1 seat", "Community support"], "prompt": "Tell me about Starter." },
+    { "title": "Pro", "points": ["Unlimited seats", "Priority support"], "recommended": true }
+  ]
+}
+```
+
+### `chart`
+Recharts `line` / `bar` / `pie` with a theme-aware palette.
+```chart
+{
+  "type": "bar",
+  "title": "Revenue vs target",
+  "xKey": "month",
+  "series": [{ "key": "revenue", "label": "Revenue" }, { "key": "target" }],
+  "data": [{ "month": "Jan", "revenue": 40, "target": 50 }]
+}
+```
+
+### `widget`
+Arbitrary AI-authored HTML/SVG rendered inside a **sandboxed iframe**. The widget can call `window.sendPrompt("...")` to inject a new turn into the chat.
+```widget
+{
+  "title": "Estimator",
+  "html": "<button onclick=\"sendPrompt('Estimate a plan for 12 people.')\">Estimate for my team</button>"
+}
+```
+
+> **Security:** widgets run with `sandbox="allow-scripts"` **only** — never `allow-same-origin`. The frame is null-origin (no parent DOM / cookies / storage). Messages are trusted by window **identity**, prompt length is capped, and theme colors are inlined (iframes don't inherit CSS vars).
+
+### Adding a new block type
+
+1. Add a Zod schema in [`src/renderers/schemas.ts`](src/renderers/schemas.ts).
+2. Write a `*Renderer.tsx` component that takes `{ data, raw }`.
+3. Register it with one line in [`src/renderers/index.ts`](src/renderers/index.ts).
 
 ---
 
-## Swapping in the real AI
+## Project structure
 
-1. Delete the `enableMocking()` block in [src/main.tsx](src/main.tsx) and the
-   `src/mocks/` folder.
-2. Point [src/api/chat.ts](src/api/chat.ts) at the real endpoint (keep it
-   returning a markdown string).
-3. Prompt the model to emit rich blocks per [STANDARDS.md](STANDARDS.md).
+```
+src/
+├── App.tsx                     # Shell: Chat / Gallery tabs, theme + mode toggles
+├── api/
+│   ├── chat.ts                 # streamChat() — real Flask SSE client + dispatch
+│   └── mockChat.ts             # word-by-word streaming of local fixtures
+├── components/                 # ChatView, Composer, Message, ErrorBoundary, Gallery, ui/*
+├── data/fixtures.ts            # canned mock responses (chosen by query)
+├── lib/
+│   ├── config.ts               # env + runtime AI-mode resolution
+│   ├── useChatSession.ts       # the chat engine (shared by composer + blocks)
+│   └── useTheme.ts             # light/dark
+├── markdown/
+│   ├── MarkdownRenderer.tsx    # react-markdown entry point
+│   ├── overrides.tsx           # fence interception
+│   ├── RichBlock.tsx           # dispatcher + graceful degradation
+│   ├── BlockSkeleton.tsx       # typed streaming placeholders
+│   └── ChatContext / StreamingContext
+└── renderers/
+    ├── registry.ts             # the renderer registry
+    ├── schemas.ts              # Zod contracts
+    ├── index.ts                # registrations
+    └── CalloutRenderer / CompareRenderer / ChartRenderer / WidgetRenderer
+```
+
+The **chat bridge** ([`useChatSession`](src/lib/useChatSession.ts)) exposes a single `sendPrompt` used by **both** the composer **and** interactive blocks — so a Compare button or a Widget can start a new turn on the exact same path as typing.
+
+---
+
+## Status
+
+Prototype (v0.1.0) — a UI/architecture proof-of-concept. Try it in **Mock** mode first, then point it at a real backend via `.env.local`.
