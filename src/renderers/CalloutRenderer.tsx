@@ -1,6 +1,6 @@
 import { Info, Lightbulb, TriangleAlert, OctagonAlert } from 'lucide-react';
 import type { RichRendererProps } from './registry';
-import type { CalloutSpec } from '@/types';
+import type { CalloutPayload } from './schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 
@@ -16,7 +16,7 @@ const VARIANT = {
 } as const;
 
 export function CalloutRenderer({ data }: RichRendererProps) {
-  const spec = data as CalloutSpec;
+  const spec = data as CalloutPayload;
   const variant = VARIANT[spec.variant] ?? VARIANT.note;
   const Icon = variant.icon;
 

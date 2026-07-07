@@ -4,8 +4,6 @@ import {
   Line,
   BarChart,
   Bar,
-  AreaChart,
-  Area,
   PieChart,
   Pie,
   Cell,
@@ -16,7 +14,7 @@ import {
   Legend,
 } from 'recharts';
 import type { RichRendererProps } from './registry';
-import type { ChartSpec } from '@/types';
+import type { ChartPayload } from './schemas';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Theme-aware categorical palette (driven by CSS vars in index.css).
@@ -30,27 +28,6 @@ const PALETTE = [
 ];
 const colorAt = (i: number, override?: string) => override ?? PALETTE[i % PALETTE.length];
 
-export function ChartRenderer({ data }: RichRendererProps) {
-  const spec = data as ChartSpec;
-  const height = spec.height ?? 300;
-  const xKey = spec.xKey ?? 'x';
-
-  return (
-    <Card className="my-4">
-      {spec.title && (
-        <CardHeader className="pb-0">
-          <CardTitle className="text-sm font-semibold">{spec.title}</CardTitle>
-        </CardHeader>
-      )}
-      <CardContent className="pt-4">
-        <ResponsiveContainer width="100%" height={height}>
-          {renderChart(spec, xKey)}
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
-  );
-}
-
 const gridStroke = 'hsl(var(--rich-grid))';
 const axisStroke = 'hsl(var(--rich-axis))';
 const tooltipStyle = {
@@ -61,11 +38,31 @@ const tooltipStyle = {
   fontSize: 12,
 };
 
-function renderChart(spec: ChartSpec, xKey: string) {
+export function ChartRenderer({ data }: RichRendererProps) {
+  const spec = data as ChartPayload;
+  const height = spec.height ?? 300;
+
+  return (
+    <Card className="my-4">
+      {spec.title && (
+        <CardHeader className="pb-0">
+          <CardTitle className="text-sm font-semibold">{spec.title}</CardTitle>
+        </CardHeader>
+      )}
+      <CardContent className="pt-4">
+        <ResponsiveContainer width="100%" height={height}>
+          {renderChart(spec)}
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+function renderChart(spec: ChartPayload) {
   const grid = <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />;
   const axes = (
     <>
-      <XAxis dataKey={xKey} stroke={axisStroke} tick={{ fontSize: 12, fill: axisStroke }} />
+      <XAxis dataKey={spec.xKey} stroke={axisStroke} tick={{ fontSize: 12, fill: axisStroke }} />
       <YAxis stroke={axisStroke} tick={{ fontSize: 12, fill: axisStroke }} />
     </>
   );
@@ -81,38 +78,9 @@ function renderChart(spec: ChartSpec, xKey: string) {
           {tooltip}
           {legend}
           {spec.series.map((s, i) => (
-            <Bar
-              key={s.key}
-              dataKey={s.key}
-              name={s.label ?? s.key}
-              fill={colorAt(i, s.color)}
-              stackId={spec.stacked ? 'stack' : undefined}
-              radius={[3, 3, 0, 0]}
-            />
+            <Bar key={s.key} dataKey={s.key} name={s.label ?? s.key} fill={colorAt(i, s.color)} radius={[3, 3, 0, 0]} />
           ))}
         </BarChart>
-      );
-
-    case 'area':
-      return (
-        <AreaChart data={spec.data}>
-          {grid}
-          {axes}
-          {tooltip}
-          {legend}
-          {spec.series.map((s, i) => (
-            <Area
-              key={s.key}
-              type="monotone"
-              dataKey={s.key}
-              name={s.label ?? s.key}
-              stroke={colorAt(i, s.color)}
-              fill={colorAt(i, s.color)}
-              fillOpacity={0.2}
-              stackId={spec.stacked ? 'stack' : undefined}
-            />
-          ))}
-        </AreaChart>
       );
 
     case 'pie': {
@@ -121,7 +89,7 @@ function renderChart(spec: ChartSpec, xKey: string) {
         <PieChart>
           {tooltip}
           {legend}
-          <Pie data={spec.data} dataKey={valueKey} nameKey={xKey} cx="50%" cy="50%" outerRadius={100} label>
+          <Pie data={spec.data} dataKey={valueKey} nameKey={spec.xKey} cx="50%" cy="50%" outerRadius={100} label>
             {spec.data.map((_, i) => (
               <Cell key={i} fill={colorAt(i)} />
             ))}

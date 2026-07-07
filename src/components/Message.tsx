@@ -1,94 +1,71 @@
-import { useState } from 'react';
-import { Check, Code2, Copy, Eye, Sparkles, User } from 'lucide-react';
-import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
-import { ThoughtSection } from './ThoughtSection';
-import { References } from './ReferenceCards';
-import { SuggestedQuestions } from './SuggestedQuestions';
-import { Button } from '@/components/ui/button';
-import type { SendFn } from './Composer';
-import type { ChatMessage } from '@/types';
+import { memo } from 'react';
+import { CopyMarkdownButton } from '@/components/CopyMarkdownButton';
+import { MarkdownRenderer } from '@/markdown/MarkdownRenderer';
+import type { ChatContextValue } from '@/markdown/ChatContext';
 import { cn } from '@/lib/utils';
 
-function TypingDots() {
-  return (
-    <div className="flex items-center gap-1.5 pt-2.5">
-      <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
-      <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
-      <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground" />
-    </div>
-  );
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  /** Assistant "thinking" stream (shown collapsibly), if the backend sends one. */
+  thought?: string;
+  /** Set when the turn failed, so the bubble can show an error instead. */
+  error?: string;
 }
 
-function AssistantBody({ message, onAsk }: { message: ChatMessage; onAsk: SendFn }) {
-  const [copied, setCopied] = useState(false);
-  const [showRaw, setShowRaw] = useState(false);
-
-  const awaitingFirstToken = message.streaming && !message.content && !message.thought;
-  const showTools = !message.streaming && !!message.content;
-
-  const copy = () => {
-    void navigator.clipboard?.writeText(message.content);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
-  };
-
-  return (
-    <>
-      {message.thought && <ThoughtSection thought={message.thought} streaming={message.streaming} />}
-      {awaitingFirstToken ? (
-        <TypingDots />
-      ) : showRaw ? (
-        <pre className="my-1 overflow-x-auto rounded-lg border bg-muted/50 p-4 text-xs leading-relaxed">
-          <code>{message.content}</code>
-        </pre>
-      ) : (
-        <MarkdownRenderer content={message.content} streaming={message.streaming} />
-      )}
-
-      {showTools && (
-        <div className="mt-2 flex items-center gap-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-          <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={copy}>
-            {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
-            {copied ? 'Copied' : 'Copy'}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1.5 px-2 text-xs"
-            onClick={() => setShowRaw((v) => !v)}
-          >
-            {showRaw ? <Eye className="h-3.5 w-3.5" /> : <Code2 className="h-3.5 w-3.5" />}
-            {showRaw ? 'Rendered' : 'View raw'}
-          </Button>
-        </div>
-      )}
-
-      <References laws={message.relevantLaws} judgments={message.relevantJudgments} />
-      <SuggestedQuestions questions={message.suggestedQuestions} onAsk={onAsk} />
-    </>
-  );
+interface MessageProps {
+  message: ChatMessage;
+  /** True while this specific assistant message is still streaming. */
+  streaming?: boolean;
+  chat?: ChatContextValue;
 }
 
-export function Message({ message, onAsk }: { message: ChatMessage; onAsk: SendFn }) {
+export const Message = memo(function Message({ message, streaming = false, chat }: MessageProps) {
   const isUser = message.role === 'user';
 
-  return (
-    <div className="group mx-auto mb-7 flex max-w-4xl gap-3.5">
-      <div
-        className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border',
-          isUser ? 'bg-muted' : 'border-transparent bg-primary text-primary-foreground',
-        )}
-      >
-        {isUser ? <User className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-primary px-4 py-2 text-sm text-primary-foreground">
+          {message.content}
+        </div>
       </div>
-      <div className="min-w-0 flex-1 pt-0.5">
-        {isUser ? (
-          <p className="m-0 whitespace-pre-wrap">{message.content}</p>
-        ) : (
-          <AssistantBody message={message} onAsk={onAsk} />
-        )}
+    );
+  }
+
+  const showCopy = !streaming && !!message.content && !message.error;
+
+  return (
+    <div className="flex justify-start">
+      <div className={cn('w-full max-w-full rounded-2xl rounded-bl-sm border bg-card px-4 py-3')}>
+        <div className="relative">
+          {showCopy && (
+            <div className="absolute right-0 top-0">
+              <CopyMarkdownButton content={message.content} />
+            </div>
+          )}
+          <div className={cn(showCopy && 'pr-8')}>
+            {message.thought && (
+              <details className="mb-2 rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                <summary className="cursor-pointer select-none font-medium">Thinking</summary>
+                <p className="mt-1 whitespace-pre-wrap">{message.thought}</p>
+              </details>
+            )}
+            {message.error ? (
+              <p className="text-sm text-destructive">⚠ {message.error}</p>
+            ) : message.content ? (
+              <MarkdownRenderer content={message.content} streaming={streaming} chat={chat} />
+            ) : (
+              <span className="inline-flex gap-1 py-1">
+                <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.2s]" />
+                <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.1s]" />
+                <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50" />
+              </span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
-}
+});

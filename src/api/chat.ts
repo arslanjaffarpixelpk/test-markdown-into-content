@@ -1,53 +1,16 @@
-import type { SampleMeta } from '../types';
+import { getAiMode, AI_BASE, X_API_KEY, AI_MODEL } from '@/lib/config';
+import { mockStreamChat } from './mockChat';
 
 /**
- * The integration point with the "AI backend".
+ * The single integration point with the AI backend.
  *
- * - `fetchSamples` / `fetchChat` drive the MSW-mocked sample sidebar (static
- *   markdown fixtures). Left untouched.
- * - `streamChat` / `ensureSessionToken` talk to the real (local) Flask AI server
- *   over Server-Sent Events, ported from law-bot-frontend's ChatHandler. This is
- *   what powers the live chat composer.
+ * `streamChat` powers the chat composer. It dispatches to either the mock
+ * backend (simulated streaming of local fixtures, no server) or the real Flask
+ * AI server over SSE, based on `AI_MODE` (VITE_AI_MODE). App code imports only
+ * this function, so switching modes needs no changes elsewhere.
  *
- * The AI base URL comes from `VITE_AI_SERVER_URL`. Set it to `/ai` (default) to
- * route through the Vite dev proxy at `http://localhost:5000` and avoid CORS.
+ * The real SSE handling is ported from law-bot-frontend's ChatHandler.
  */
-
-// Accept either a server origin ("https://host", "http://localhost:5000", or the
-// "/ai" proxy path) OR the full chat endpoint ("https://host/api/chat") — normalize
-// to the base so `${AI_BASE}/api/chat` and `${AI_BASE}/api/create_chat_session`
-// resolve correctly in both cases.
-const AI_BASE = (import.meta.env.VITE_AI_SERVER_URL ?? '')
-  .replace(/\/+$/, '')
-  .replace(/\/api\/chat$/, '');
-const X_API_KEY = import.meta.env.VITE_XAPIKey ?? '';
-
-// ---------------------------------------------------------------------------
-// Mock sample playback (unchanged) — served by MSW at relative /api/* paths.
-// ---------------------------------------------------------------------------
-
-/** List the available sample responses (drives the sidebar). */
-export async function fetchSamples(): Promise<SampleMeta[]> {
-  const res = await fetch('/api/samples');
-  if (!res.ok) throw new Error(`fetchSamples failed: ${res.status}`);
-  return res.json();
-}
-
-/** Request a sample assistant response; returns markdown. */
-export async function fetchChat(sampleId: string): Promise<string> {
-  const res = await fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sampleId }),
-  });
-  if (!res.ok) throw new Error(`fetchChat failed: ${res.status}`);
-  const data = (await res.json()) as { content: string };
-  return data.content;
-}
-
-// ---------------------------------------------------------------------------
-// Live streaming chat against the Flask AI server (SSE).
-// ---------------------------------------------------------------------------
 
 /** A single Server-Sent-Event payload from the Flask stream (heuristic shape). */
 export interface StreamEvent {
@@ -62,16 +25,15 @@ export interface StreamEvent {
   relevant_laws?: unknown[];
   relevant_judgments?: unknown[];
   suggested_questions?: string[];
-  language?: string;
   message?: string;
 }
 
 export interface StreamChatArgs {
   /** The user's question. */
   query: string;
-  /** LLM model id (e.g. "gemini"). */
+  /** LLM model id (defaults to VITE_AI_MODEL / "gemini"). */
   model?: string;
-  /** Recent turns for context; last few are sent as `previous_chat_history`. */
+  /** Recent turns for context; the last few are sent as `previous_chat_history`. */
   history?: Array<{ user: string; bot: string }>;
   /** Called with each answer delta (append to the assistant message). */
   onToken: (chunk: string) => void;
@@ -83,10 +45,14 @@ export interface StreamChatArgs {
   signal?: AbortSignal;
 }
 
+/** Dispatch to the mock or real backend based on the effective AI mode. */
+export function streamChat(args: StreamChatArgs): Promise<void> {
+  return getAiMode() === 'mock' ? mockStreamChat(args) : realStreamChat(args);
+}
+
 /**
  * Return a cached chat session token, or mint one from the Flask server.
- * Mirrors law-bot's `generateSessionToken`: on failure it falls back to a local
- * token so the app never blocks (the server may still reject it — see plan).
+ * On failure it falls back to a local token so the app never blocks.
  */
 export async function ensureSessionToken(signal?: AbortSignal): Promise<string> {
   const cached = localStorage.getItem('session_token');
@@ -115,16 +81,14 @@ export async function ensureSessionToken(signal?: AbortSignal): Promise<string> 
 }
 
 /**
- * Stream an assistant response from the Flask AI server.
+ * Stream an assistant response from the Flask AI server (SSE).
  *
- * Ports the SSE handling from law-bot-frontend/src/components/home/ChatHandler.tsx:
- * a POST that returns `text/event-stream`, read incrementally, with each line
+ * A POST returns `text/event-stream`, read incrementally, with each line
  * stripped of its `data:` prefix and JSON objects reassembled by brace-depth
- * balancing (they may span multiple lines). Events are dispatched to the
- * callbacks. Resolves when the stream ends or completes.
+ * balancing (a single event may span multiple lines).
  */
-export async function streamChat(args: StreamChatArgs): Promise<void> {
-  const { query, model = 'gemini', history = [], onToken, onThought, onEvent, signal } = args;
+async function realStreamChat(args: StreamChatArgs): Promise<void> {
+  const { query, model = AI_MODEL, history = [], onToken, onThought, onEvent, signal } = args;
 
   const session_token = await ensureSessionToken(signal);
   const userId = localStorage.getItem('userId') || '';
@@ -136,12 +100,9 @@ export async function streamChat(args: StreamChatArgs): Promise<void> {
   if (userId) formData.append('user_id', userId);
   formData.append('previous_chat_history', JSON.stringify(history.slice(-3)));
 
-  const response = await fetch(`${AI_BASE}/api/chat`, {
+  const response = await fetch(`${AI_BASE}/api/chat_svg`, {
     method: 'POST',
-    headers: {
-      Accept: 'text/event-stream',
-      'X-API-Key': X_API_KEY,
-    },
+    headers: { Accept: 'text/event-stream', 'X-API-Key': X_API_KEY },
     body: formData,
     signal,
   });
@@ -200,15 +161,13 @@ export async function streamChat(args: StreamChatArgs): Promise<void> {
   // --- Brace-balanced reassembly of JSON events split across lines. ---
   let eventBuffer = '';
   let braceDepth = 0;
-  const countDelta = (s: string) =>
-    (s.match(/\{/g) || []).length - (s.match(/\}/g) || []).length;
+  const countDelta = (s: string) => (s.match(/\{/g) || []).length - (s.match(/\}/g) || []).length;
 
   const feedLine = (rawLine: string) => {
     const trimmed = rawLine.trim();
     if (!trimmed) return;
     let line = trimmed;
     if (line.startsWith('data:')) line = line.slice(5).trim();
-    // Ignore keepalive tokens (anything before the first `{`).
     if (!line.startsWith('{') && eventBuffer === '') return;
 
     if (eventBuffer === '') {
@@ -223,7 +182,7 @@ export async function streamChat(args: StreamChatArgs): Promise<void> {
       try {
         handleEvent(JSON.parse(eventBuffer) as StreamEvent);
       } catch {
-        // ignore malformed keepalive
+        /* ignore malformed keepalive */
       }
       eventBuffer = '';
       braceDepth = 0;
@@ -260,6 +219,5 @@ export async function streamChat(args: StreamChatArgs): Promise<void> {
     if (started && Date.now() - lastChunkAt > watchdogMs) break;
   }
 
-  // Flush any trailing partial line.
   if (!completed && buffer.length > 0) feedLine(buffer);
 }

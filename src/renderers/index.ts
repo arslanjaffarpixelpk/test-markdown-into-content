@@ -1,46 +1,53 @@
 /**
- * Registers every built-in renderer. Import this module once at app boot
- * (see main.tsx) for its side effects.
+ * Registers all built-in rich renderers. Imported once for its side effects
+ * from `main.tsx` (before the app renders).
  *
- * To add a new content type: create a renderer component and add one
- * `registerRenderer(...)` line here. Nothing else in the pipeline changes.
+ * Adding a new block type is a 3-step change: a Zod schema in `schemas.ts`, a
+ * `*Renderer.tsx` component, and one `registerRenderer(...)` line here.
  */
 import { registerRenderer } from './registry';
-import { ChartRenderer } from './ChartRenderer';
-import { TableRenderer } from './TableRenderer';
-import { TimelineRenderer } from './TimelineRenderer';
-import { MermaidRenderer } from './MermaidRenderer';
-import { InfographicRenderer } from './InfographicRenderer';
-import { TemplateRenderer } from './TemplateRenderer';
+import {
+  calloutSchema,
+  compareSchema,
+  chartSchema,
+  widgetSchema,
+  svgSchema,
+  timelineSchema,
+  stepsSchema,
+  mermaidSchema,
+  faqSchema,
+  accordionSchema,
+  trackerSchema,
+  jsonSchema,
+} from './schemas';
 import { CalloutRenderer } from './CalloutRenderer';
+import { CompareRenderer } from './CompareRenderer';
+import { ChartRenderer } from './ChartRenderer';
+import { WidgetRenderer } from './WidgetRenderer';
+import { SvgRenderer } from './SvgRenderer';
+import { TimelineRenderer } from './TimelineRenderer';
+import { StepperRenderer } from './StepperRenderer';
+import { MermaidRenderer } from './MermaidRenderer';
+import { FaqRenderer } from './FaqRenderer';
 import { AccordionRenderer } from './AccordionRenderer';
-import { StepsRenderer } from './StepsRenderer';
-import { CodeGroupRenderer } from './CodeGroupRenderer';
-import { CardsRenderer } from './CardsRenderer';
-import { BadgesRenderer } from './BadgesRenderer';
-import { ProgressRenderer } from './ProgressRenderer';
+import { TrackerRenderer } from './TrackerRenderer';
+import { JsonRenderer } from './JsonRenderer';
 
-// Data visualisation & structure
-registerRenderer('chart', { render: ChartRenderer, label: 'Chart' });
-registerRenderer('table', { render: TableRenderer, label: 'Interactive table' });
-registerRenderer('timeline', { render: TimelineRenderer, label: 'Timeline' });
-registerRenderer('infographic', { render: InfographicRenderer, label: 'Infographic' });
-registerRenderer('progress', { render: ProgressRenderer, label: 'Progress bars' });
-
-// Content & layout
-registerRenderer('callout', { render: CalloutRenderer, label: 'Callout' });
-registerRenderer('accordion', { render: AccordionRenderer, label: 'Accordion' });
-registerRenderer('steps', { render: StepsRenderer, label: 'Steps' });
-registerRenderer('codegroup', { render: CodeGroupRenderer, label: 'Code group' });
-registerRenderer('cards', { render: CardsRenderer, label: 'Card grid' });
-registerRenderer('badges', { render: BadgesRenderer, label: 'Badges' });
-
-// Interactive
-registerRenderer('template', { render: TemplateRenderer, label: 'Interactive template' });
-
-// Mermaid is a DSL, not JSON — parse with identity so `raw` is used directly.
+registerRenderer('callout', { render: CalloutRenderer, schema: calloutSchema, label: 'Callout' });
+registerRenderer('compare', { render: CompareRenderer, schema: compareSchema, label: 'Compare' });
+registerRenderer('chart', { render: ChartRenderer, schema: chartSchema, label: 'Chart' });
+registerRenderer('widget', { render: WidgetRenderer, schema: widgetSchema, label: 'Widget' });
+registerRenderer('svg', { render: SvgRenderer, schema: svgSchema, parse: (raw) => raw, label: 'SVG' });
+registerRenderer('timeline', { render: TimelineRenderer, schema: timelineSchema, label: 'Timeline' });
+registerRenderer('steps', { render: StepperRenderer, schema: stepsSchema, label: 'Steps' });
+registerRenderer('stepper', { render: StepperRenderer, schema: stepsSchema, label: 'Stepper' });
 registerRenderer('mermaid', {
   render: MermaidRenderer,
+  schema: mermaidSchema,
   parse: (raw) => raw,
-  label: 'Diagram (Mermaid)',
+  label: 'Mermaid',
 });
+registerRenderer('faq', { render: FaqRenderer, schema: faqSchema, label: 'FAQ' });
+registerRenderer('accordion', { render: AccordionRenderer, schema: accordionSchema, label: 'Accordion' });
+registerRenderer('tracker', { render: TrackerRenderer, schema: trackerSchema, label: 'Tracker' });
+registerRenderer('json', { render: JsonRenderer, schema: jsonSchema, label: 'JSON' });

@@ -29,7 +29,7 @@
     --ring: 222.2 84% 4.9%;
     --radius: 0.6rem;
 
-    /* chart internals (consumed by Recharts via CSS vars) */
+    /* chart categorical palette (consumed by Recharts via CSS vars) */
     --chart-1: 222 47% 40%;
     --chart-2: 142 71% 45%;
     --chart-3: 38 92% 50%;
@@ -118,9 +118,6 @@
   .markdown-body li {
     @apply my-1;
   }
-  .markdown-body li > input[type='checkbox'] {
-    @apply mr-2 align-middle;
-  }
   .markdown-body a {
     @apply font-medium text-primary underline underline-offset-4;
   }
@@ -136,12 +133,16 @@
   .markdown-body pre.code-block code {
     @apply bg-transparent p-0;
   }
+  .markdown-body table {
+    @apply my-4 w-full overflow-hidden rounded-lg border text-sm;
+  }
+  .markdown-body th {
+    @apply bg-muted/50 px-4 py-2 text-left font-medium;
+  }
+  .markdown-body td {
+    @apply border-t px-4 py-2;
+  }
   .markdown-body hr {
     @apply my-6 border-border;
-  }
-
-  /* Mermaid diagrams render inline SVG; center + constrain */
-  .rich-mermaid svg {
-    @apply mx-auto h-auto max-w-full;
   }
 }

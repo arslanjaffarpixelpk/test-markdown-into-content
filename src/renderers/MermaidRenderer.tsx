@@ -1,65 +1,60 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import mermaid from 'mermaid';
 import type { RichRendererProps } from './registry';
+import type { MermaidPayload } from './schemas';
 import { Card, CardContent } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { TriangleAlert } from 'lucide-react';
+import { useTheme } from '@/lib/useTheme';
 
-function ensureInit(dark: boolean) {
-  // Re-init before each render so the diagram matches the current light/dark theme.
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: 'strict', // no click-through JS from AI-authored diagrams
-    theme: dark ? 'dark' : 'default',
-    fontFamily: 'inherit',
-  });
-}
-
-/**
- * Flow / sequence / gantt diagrams. The block body is raw Mermaid DSL, so the
- * registry entry parses with identity and we render `raw` directly.
- */
-export function MermaidRenderer({ raw }: RichRendererProps) {
-  const rawId = useId().replace(/[^a-zA-Z0-9]/g, '');
+export function MermaidRenderer({ data }: RichRendererProps) {
+  const code = data as MermaidPayload;
+  const { theme } = useTheme();
+  const id = useId().replace(/:/g, '');
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const dark = document.documentElement.classList.contains('dark');
-    ensureInit(dark);
-    mermaid
-      .render(`mermaid-${rawId}`, raw.trim())
-      .then(({ svg }) => {
+
+    async function render() {
+      setError(null);
+      try {
+        const mermaid = (await import('mermaid')).default;
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: theme === 'dark' ? 'dark' : 'default',
+          securityLevel: 'strict',
+        });
+        const { svg } = await mermaid.render(`mermaid-${id}`, code.trim());
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
-          setError(null);
         }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      });
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to render diagram');
+        }
+      }
+    }
+
+    void render();
     return () => {
       cancelled = true;
     };
-  }, [raw, rawId]);
+  }, [code, theme, id]);
 
   if (error) {
     return (
-      <Alert variant="destructive" className="my-4">
-        <TriangleAlert className="h-4 w-4" />
-        <AlertTitle>Diagram error</AlertTitle>
-        <AlertDescription>
-          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs">{raw}</pre>
-        </AlertDescription>
-      </Alert>
+      <Card className="my-4 border-destructive/50">
+        <CardContent className="p-4">
+          <p className="text-sm text-destructive">Could not render Mermaid diagram: {error}</p>
+          <pre className="mt-2 overflow-x-auto rounded bg-muted/50 p-2 text-xs">{code}</pre>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <Card className="my-4">
-      <CardContent className="rich-mermaid flex justify-center overflow-x-auto pt-6">
-        <div ref={containerRef} />
+    <Card className="my-4 overflow-hidden">
+      <CardContent className="overflow-x-auto p-4">
+        <div ref={containerRef} className="mermaid-diagram flex justify-center [&_svg]:max-w-full" />
       </CardContent>
     </Card>
   );
