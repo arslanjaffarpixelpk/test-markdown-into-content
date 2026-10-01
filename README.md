@@ -1,4 +1,5 @@
 # Rich Inline Chat — Prototype
+arslan- ssh key:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDXcooevF66MGqvvfIaxIBaX4QpgAnvKuUMdh9XdTJ7Y arslanjaffar@pixelpk.com
 
 Render **structured AI markdown inline in a streaming chat**. Instead of a flat wall of text, the AI emits special fenced code blocks — `callout`, `compare`, `chart`, `widget` — that are intercepted and rendered as **live React components** right in the chat stream, with Zod validation, typed streaming skeletons, and a sandboxed interactive widget that can send prompts back into the conversation.
 
